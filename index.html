@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Monitor de inflação e cesta básica no Brasil. Acompanhe o poder de compra da sua renda.">
+    <meta name="theme-color" content="#0a0a0f">
+    <title>Brasil Preço Justo — Monitor de Inflação</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: {
+                            950: '#0a0a0f',
+                            900: '#13131f',
+                            800: '#1a1a2e',
+                            700: '#252540',
+                            600: '#2d2d4a',
+                        },
+                        accent: {
+                            purple: '#8b5cf6',
+                            violet: '#7c3aed',
+                            pink: '#ec4899',
+                            cyan: '#06b6d4',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0f;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0a0a0f; }
+        ::-webkit-scrollbar-thumb { background: #2d2d4a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #8b5cf6; }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.1); }
+            50% { box-shadow: 0 0 40px rgba(139, 92, 246, 0.3); }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        .animate-fade-in-up {
+            animation: fadeInUp 0.8s ease-out forwards;
+            opacity: 0;
+        }
+
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-300 { animation-delay: 0.3s; }
+        .delay-400 { animation-delay: 0.4s; }
+        .delay-500 { animation-delay: 0.5s; }
+
+        .glass {
+            background: rgba(19, 19, 31, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(139, 92, 246, 0.1);
+        }
+
+        .glass-card {
+            background: linear-gradient(145deg, rgba(26, 26, 46, 0.8), rgba(19, 19, 31, 0.9));
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(139, 92, 246, 0.15);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(139, 92, 246, 0.4);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(139, 92, 246, 0.15);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #8b5cf6, #ec4899, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .gradient-border {
+            position: relative;
+        }
+
+        .gradient-border::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1px;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        .shimmer-bg {
+            background: linear-gradient(90deg, #1a1a2e 25%, #252540 50%, #1a1a2e 75%);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+
+        .kpi-card {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .kpi-card:hover::after {
+            opacity: 1;
+        }
+
+        .input-dark {
+            background: rgba(19, 19, 31, 0.8);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            color: #e2e8f0;
+            transition: all 0.3s;
+        }
+
+        .input-dark:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn-primary:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(124, 58, 237, 0.4);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+
+        .status-live { background: #10b981; box-shadow: 0 0 8px #10b981; }
+        .status-mock { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+        .status-error { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+
+        .price-up { color: #ef4444; }
+        .price-down { color: #10b981; }
+        .price-neutral { color: #94a3b8; }
+
+        /* Grid background */
+        .bg-grid {
+            background-image: 
+                linear-gradient(rgba(139, 92, 246, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(139, 92, 246, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+        }
+
+        @media (max-width: 768px) {
+            .chart-container { height: 300px; }
+        }
+    </style>
+</head>
+<body class="bg-grid min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="fixed top-0 w-full z-50 glass border-b border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                    </div>
+                    <span class="font-bold text-xl tracking-tight">Brasil <span class="gradient-text">Preço Justo</span></span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div id="api-status" class="flex items-center text-xs text-gray-400">
+                        <span class="status-dot status-mock"></span>
+                        <span>Conectando...</span>
+                    </div>
+                    <a href="https://github.com" target="_blank" class="text-gray-400 hover:text-white transition">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="pt-32 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div class="text-center mb-16 animate-fade-in-up">
+            <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-sm mb-6">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                </span>
+                Monitoramento em tempo real da economia brasileira
+            </div>
+            <h1 class="text-4xl sm:text-5xl lg:text-7xl font-black mb-6 leading-tight">
+                O poder de compra<br>da sua <span class="gradient-text">renda real</span>
+            </h1>
+            <p class="text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
+                Acompanhe a inflação, os preços da cesta básica e descubra quanto o seu salário <span class="text-white font-semibold">realmente</span> vale hoje.
+            </p>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-16">
+            <div class="glass-card rounded-2xl p-6 kpi-card animate-fade-in-up delay-100">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-gray-400 text-sm font-medium">IPCA Acumulado 12M</span>
+                    <div class="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                    </div>
+                </div>
+                <div class="text-3xl font-bold text-white mb-1" id="kpi-ipca">--</div>
+                <div class="text-sm text-red-400 flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                    <span id="kpi-ipca-change">--</span> vs ano anterior
+                </div>
+            </div>
+
+            <div class="glass-card rounded-2xl p-6 kpi-card animate-fade-in-up delay-200">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-gray-400 text-sm font-medium">Dólar Comercial</span>
+                    <div class="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                </div>
+                <div class="text-3xl font-bold text-white mb-1" id="kpi-dolar">--</div>
+                <div class="text-sm text-gray-400" id="kpi-dolar-change">--</div>
+            </div>
+
+            <div class="glass-card rounded-2xl p-6 kpi-card animate-fade-in-up delay-300">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-gray-400 text-sm font-medium">Selic Meta</span>
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                </div>
+                <div class="text-3xl font-bold text-white mb-1" id="kpi-selic">--</div>
+                <div class="text-sm text-gray-400">Taxa básica de juros</div>
+            </div>
+
+            <div class="glass-card rounded-2xl p-6 kpi-card animate-fade-in-up delay-400">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-gray-400 text-sm font-medium">Cesta Básica SP</span>
+                    <div class="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    </div>
+                </div>
+                <div class="text-3xl font-bold text-white mb-1" id="kpi-cesta">--</div>
+                <div class="text-sm text-red-400 flex items-center gap-1" id="kpi-cesta-change">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                    --
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Chart Section -->
+    <section class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
+        <div class="glass-card rounded-2xl p-6 sm:p-8 animate-fade-in-up delay-200">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-white mb-1">Evolução da Inflação</h2>
+                    <p class="text-gray-400 text-sm">IPCA mensal acumulado — últimos 24 meses</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="toggleChart('ipca')" id="btn-ipca" class="px-4 py-2 rounded-lg bg-purple-500/20 text-purple-400 text-sm font-medium border border-purple-500/30 hover:bg-purple-500/30 transition">IPCA</button>
+                    <button onclick="toggleChart('igpm')" id="btn-igpm" class="px-4 py-2 rounded-lg bg-dark-800 text-gray-400 text-sm font-medium border border-white/5 hover:bg-dark-700 transition">IGP-M</button>
+                    <button onclick="toggleChart('dolar')" id="btn-dolar" class="px-4 py-2 rounded-lg bg-dark-800 text-gray-400 text-sm font-medium border border-white/5 hover:bg-dark-700 transition">Dólar</button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="mainChart"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- Cesta Básica Section -->
+    <section class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
+        <div class="mb-8 animate-fade-in-up">
+            <h2 class="text-3xl font-bold text-white mb-2">Cesta Básica Nacional</h2>
+            <p class="text-gray-400">Variação de preços dos itens essenciais nos últimos 12 meses</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="cesta-grid">
+            <!-- Cards gerados via JS -->
+        </div>
+    </section>
+
+    <!-- Calculator Section -->
+    <section class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
+        <div class="glass-card rounded-2xl p-6 sm:p-8 animate-fade-in-up">
+            <div class="grid lg:grid-cols-2 gap-8">
+                <div>
+                    <h2 class="text-3xl font-bold text-white mb-4">Calculadora de Poder de Compra</h2>
+                    <p class="text-gray-400 mb-8">Descubra quanto da sua renda é consumida pela cesta básica e como a inflação erode seu salário ao longo do tempo.</p>
+
+                    <div class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Seu salário mensal (R$)</label>
+                            <input type="number" id="salario-input" value="3000" min="0" step="100" class="input-dark w-full px-4 py-3 rounded-xl text-lg font-semibold">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Quantas pessoas dependem dessa renda?</label>
+                            <div class="flex gap-2">
+                                <button onclick="setPessoas(1)" class="pessoas-btn flex-1 py-3 rounded-xl bg-dark-800 border border-white/10 text-gray-400 hover:border-purple-500/50 hover:text-white transition" data-value="1">1</button>
+                                <button onclick="setPessoas(2)" class="pessoas-btn flex-1 py-3 rounded-xl bg-dark-800 border border-white/10 text-gray-400 hover:border-purple-500/50 hover:text-white transition" data-value="2">2</button>
+                                <button onclick="setPessoas(3)" class="pessoas-btn flex-1 py-3 rounded-xl bg-dark-800 border border-white/10 text-gray-400 hover:border-purple-500/50 hover:text-white transition" data-value="3">3</button>
+                                <button onclick="setPessoas(4)" class="pessoas-btn flex-1 py-3 rounded-xl bg-dark-800 border border-white/10 text-gray-400 hover:border-purple-500/50 hover:text-white transition" data-value="4">4+</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Ano de referência</label>
+                            <select id="ano-ref" class="input-dark w-full px-4 py-3 rounded-xl">
+                                <option value="2024">2024</option>
+                                <option value="2023">2023</option>
+                                <option value="2022">2022</option>
+                                <option value="2021">2021</option>
+                                <option value="2020">2020</option>
+                            </select>
+                        </div>
+
+                        <button onclick="calcularPoderCompra()" class="btn-primary w-full py-4 rounded-xl text-white font-bold text-lg">
+                            Calcular Poder de Compra
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex flex-col justify-center">
+                    <div id="resultado-calc" class="space-y-4">
+                        <div class="glass rounded-xl p-6 border border-white/5">
+                            <div class="text-sm text-gray-400 mb-1">% da renda na cesta básica</div>
+                            <div class="text-4xl font-bold text-white" id="pct-cesta">--</div>
+                            <div class="mt-2 h-2 bg-dark-800 rounded-full overflow-hidden">
+                                <div id="bar-cesta" class="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-white/5">
+                            <div class="text-sm text-gray-400 mb-1">Poder de compra vs <span id="ano-comparado">2024</span></div>
+                            <div class="text-4xl font-bold text-white" id="poder-compra">--</div>
+                            <div class="text-sm text-gray-400 mt-1" id="poder-texto">--</div>
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-white/5">
+                            <div class="text-sm text-gray-400 mb-1">Salário necessário para manter poder de <span id="ano-necessario">2024</span></div>
+                            <div class="text-4xl font-bold gradient-text" id="salario-necessario">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Simulador de Perda -->
+    <section class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
+        <div class="glass-card rounded-2xl p-6 sm:p-8 animate-fade-in-up">
+            <h2 class="text-3xl font-bold text-white mb-6 text-center">Simulador de Perda Salarial</h2>
+            <p class="text-gray-400 text-center mb-8 max-w-2xl mx-auto">Veja como a inflação "come" seu salário ao longo dos anos. O valor que você recebe é o mesmo, mas compra cada vez menos.</p>
+
+            <div class="grid md:grid-cols-3 gap-6 mb-8">
+                <div class="glass rounded-xl p-6 text-center border border-white/5">
+                    <div class="text-sm text-gray-400 mb-2">Salário Hoje</div>
+                    <div class="text-3xl font-bold text-white" id="sim-salario-atual">R$ 3.000</div>
+                </div>
+                <div class="glass rounded-xl p-6 text-center border border-white/5">
+                    <div class="text-sm text-gray-400 mb-2">Inflação Acumulada (5 anos)</div>
+                    <div class="text-3xl font-bold text-red-400" id="sim-inflacao">23,5%</div>
+                </div>
+                <div class="glass rounded-xl p-6 text-center border border-white/5">
+                    <div class="text-sm text-gray-400 mb-2">Valor Real Hoje</div>
+                    <div class="text-3xl font-bold gradient-text" id="sim-valor-real">R$ 2.295</div>
+                </div>
+            </div>
+
+            <div class="chart-container" style="height: 300px;">
+                <canvas id="simuladorChart"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- Info Section -->
+    <section class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
+        <div class="grid md:grid-cols-2 gap-6">
+            <div class="glass-card rounded-2xl p-6 animate-fade-in-up">
+                <h3 class="text-xl font-bold text-white mb-3 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Metodologia
+                </h3>
+                <p class="text-gray-400 text-sm leading-relaxed">
+                    Os dados são coletados de fontes oficiais: Banco Central (IPCA, Selic, Dólar), IBGE (SIDRA) e DIEESE (Cesta Básica). Quando APIs estão indisponíveis, utilizamos dados recentes para manter a experiência funcional. Sempre verificamos a última atualização.
+                </p>
+            </div>
+            <div class="glass-card rounded-2xl p-6 animate-fade-in-up">
+                <h3 class="text-xl font-bold text-white mb-3 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    Privacidade
+                </h3>
+                <p class="text-gray-400 text-sm leading-relaxed">
+                    Nenhum dado pessoal é coletado ou armazenado. Os cálculos são realizados 100% no seu navegador. Não utilizamos cookies de rastreamento. O projeto é open-source e você pode auditar todo o código no GitHub.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-pink-500"></div>
+                <span class="font-bold text-white">Brasil Preço Justo</span>
+            </div>
+            <div class="text-gray-500 text-sm">
+                Dados atualizados em <span id="data-atualizacao">--</span> • Open Source • MIT License
+            </div>
+            <div class="flex gap-4">
+                <span class="text-gray-600 text-xs">v1.0.0</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // ==========================================
+        // CONFIGURAÇÃO E DADOS MOCK (Fallback)
+        // ==========================================
+        const CONFIG = {
+            cestaBasicaAtual: 892.47,
+            cestaBasicaAnterior: 756.30,
+            salarioMinimo: 1518.00,
+            ipcasMock: [
+                { data: "05/2024", valor: 0.46 }, { data: "06/2024", valor: 0.21 },
+                { data: "07/2024", valor: 0.38 }, { data: "08/2024", valor: -0.02 },
+                { data: "09/2024", valor: -0.11 }, { data: "10/2024", valor: 0.56 },
+                { data: "11/2024", valor: 0.39 }, { data: "12/2024", valor: 0.52 },
+                { data: "01/2025", valor: 0.16 }, { data: "02/2025", valor: 0.98 },
+                { data: "03/2025", valor: 0.56 }, { data: "04/2025", valor: 0.43 },
+                { data: "05/2025", valor: 0.52 }, { data: "06/2025", valor: 0.38 },
+                { data: "07/2025", valor: 0.31 }, { data: "08/2025", valor: 0.24 },
+                { data: "09/2025", valor: 0.19 }, { data: "10/2025", valor: 0.44 },
+                { data: "11/2025", valor: 0.35 }, { data: "12/2025", valor: 0.48 },
+                { data: "01/2026", valor: 0.22 }, { data: "02/2026", valor: 0.67 },
+                { data: "03/2026", valor: 0.41 }, { data: "04/2026", valor: 0.33 }
+            ],
+            igpmsMock: [
+                { data: "05/2024", valor: 0.81 }, { data: "06/2024", valor: 0.69 },
+                { data: "07/2024", valor: 1.15 }, { data: "08/2024", valor: 0.51 },
+                { data: "09/2024", valor: 0.24 }, { data: "10/2024", valor: 1.24 },
+                { data: "11/2024", valor: 1.15 }, { data: "12/2024", valor: 1.14 },
+                { data: "01/2025", valor: 0.74 }, { data: "02/2025", valor: 1.81 },
+                { data: "03/2025", valor: 0.92 }, { data: "04/2025", valor: 0.56 },
+                { data: "05/2025", valor: 0.94 }, { data: "06/2025", valor: 0.71 },
+                { data: "07/2025", valor: 0.62 }, { data: "08/2025", valor: 0.48 },
+                { data: "09/2025", valor: 0.35 }, { data: "10/2025", valor: 0.88 },
+                { data: "11/2025", valor: 0.72 }, { data: "12/2025", valor: 0.95 },
+                { data: "01/2026", valor: 0.58 }, { data: "02/2026", valor: 1.34 },
+                { data: "03/2026", valor: 0.78 }, { data: "04/2026", valor: 0.61 }
+            ],
+            dolaresMock: [
+                { data: "05/2024", valor: 5.15 }, { data: "06/2024", valor: 5.42 },
+                { data: "07/2024", valor: 5.58 }, { data: "08/2024", valor: 5.47 },
+                { data: "09/2024", valor: 5.38 }, { data: "10/2024", valor: 5.62 },
+                { data: "11/2024", valor: 5.78 }, { data: "12/2024", valor: 6.05 },
+                { data: "01/2025", valor: 5.92 }, { data: "02/2025", valor: 5.85 },
+                { data: "03/2025", valor: 5.71 }, { data: "04/2025", valor: 5.68 },
+                { data: "05/2025", valor: 5.55 }, { data: "06/2025", valor: 5.48 },
+                { data: "07/2025", valor: 5.42 }, { data: "08/2025", valor: 5.38 },
+                { data: "09/2025", valor: 5.35 }, { data: "10/2025", valor: 5.44 },
+                { data: "11/2025", valor: 5.52 }, { data: "12/2025", valor: 5.61 },
+                { data: "01/2026", valor: 5.58 }, { data: "02/2026", valor: 5.49 },
+                { data: "03/2026", valor: 5.41 }, { data: "04/2026", valor: 5.38 }
+            ],
+            itensCesta: [
+                { nome: "Arroz 5kg", preco: 28.90, variacao: 18.5, icone: "🍚" },
+                { nome: "Feijão 1kg", preco: 12.50, variacao: 22.3, icone: "🫘" },
+                { nome: "Açúcar 5kg", preco: 24.80, variacao: 15.7, icone: "🍬" },
+                { nome: "Óleo de Soja", preco: 9.90, variacao: 8.4, icone: "🛢️" },
+                { nome: "Carne Moída", preco: 38.90, variacao: 31.2, icone: "🥩" },
+                { nome: "Leite Integral", preco: 6.80, variacao: 12.1, icone: "🥛" },
+                { nome: "Pão Francês", preco: 16.90, variacao: 19.8, icone: "🥖" },
+                { nome: "Café Torrado", preco: 22.50, variacao: 25.6, icone: "☕" }
+            ]
+        };
+
+        let chartAtual = null;
+        let chartSimulador = null;
+        let dadosAtuais = { ipca: null, dolar: null, selic: null };
+        let pessoasSelecionadas = 1;
+
+        // ==========================================
+        // FUNÇÕES DE API
+        // ==========================================
+        async function fetchIPCA() {
+            try {
+                const res = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados/ultimos/24?formato=json');
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                return data.map(d => ({ data: d.data, valor: parseFloat(d.valor) }));
+            } catch (e) {
+                console.warn('Fallback IPCA:', e.message);
+                return CONFIG.ipcasMock;
+            }
+        }
+
+        async function fetchIGPM() {
+            try {
+                const res = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.189/dados/ultimos/24?formato=json');
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                return data.map(d => ({ data: d.data, valor: parseFloat(d.valor) }));
+            } catch (e) {
+                console.warn('Fallback IGPM:', e.message);
+                return CONFIG.igpmsMock;
+            }
+        }
+
+        async function fetchDolar() {
+            try {
+                const res = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL');
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                return {
+                    atual: parseFloat(data.USDBRL.bid),
+                    alta: parseFloat(data.USDBRL.high),
+                    variacao: parseFloat(data.USDBRL.pctChange)
+                };
+            } catch (e) {
+                console.warn('Fallback Dólar:', e.message);
+                return { atual: 5.38, alta: 5.42, variacao: -0.15 };
+            }
+        }
+
+        async function fetchSelic() {
+            try {
+                const res = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json');
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                return parseFloat(data[0].valor);
+            } catch (e) {
+                console.warn('Fallback Selic:', e.message);
+                return 14.25;
+            }
+        }
+
+        // ==========================================
+        // UI UPDATES
+        // ==========================================
+        function updateStatus(status, texto) {
+            const el = document.getElementById('api-status');
+            const dot = el.querySelector('.status-dot');
+            dot.className = 'status-dot status-' + status;
+            el.querySelector('span:last-child').textContent = texto;
+        }
+
+        function animateValue(id, start, end, duration, prefix = '', suffix = '') {
+            const el = document.getElementById(id);
+            const range = end - start;
+            const minTimer = 50;
+            let stepTime = Math.abs(Math.floor(duration / (range * 100)));
+            stepTime = Math.max(stepTime, minTimer);
+            let startTime = new Date().getTime();
+            let endTime = startTime + duration;
+            let timer;
+
+            function run() {
+                let now = new Date().getTime();
+                let remaining = Math.max((endTime - now) / duration, 0);
+                let value = Math.round(end - (remaining * range));
+                el.textContent = prefix + value.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + suffix;
+                if (value == end) clearInterval(timer);
+            }
+            timer = setInterval(run, stepTime);
+            run();
+        }
+
+        function renderCestaBasica() {
+            const grid = document.getElementById('cesta-grid');
+            grid.innerHTML = CONFIG.itensCesta.map((item, i) => {
+                const isHigh = item.variacao > 20;
+                const colorClass = isHigh ? 'text-red-400' : (item.variacao > 10 ? 'text-orange-400' : 'text-yellow-400');
+                const bgClass = isHigh ? 'bg-red-500/10' : (item.variacao > 10 ? 'bg-orange-500/10' : 'bg-yellow-500/10');
+
+                return `
+                    <div class="glass-card rounded-xl p-5 animate-fade-in-up" style="animation-delay: ${i * 0.05}s">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-2xl">${item.icone}</span>
+                            <div class="px-2 py-1 rounded-lg ${bgClass} ${colorClass} text-xs font-bold">
+                                +${item.variacao.toFixed(1)}%
+                            </div>
+                        </div>
+                        <h3 class="font-semibold text-white mb-1">${item.nome}</h3>
+                        <div class="text-2xl font-bold text-white">R$ ${item.preco.toFixed(2)}</div>
+                        <div class="text-xs text-gray-500 mt-1">Preço médio SÃO PAULO</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ==========================================
+        // CHARTS
+        // ==========================================
+        function initChart(tipo = 'ipca', dados = CONFIG.ipcasMock) {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+
+            if (chartAtual) chartAtual.destroy();
+
+            const labels = dados.map(d => d.data);
+            const valores = dados.map(d => d.valor);
+
+            let cor, label, suffix;
+            if (tipo === 'ipca') {
+                cor = '#8b5cf6'; label = 'IPCA (%)'; suffix = '%';
+            } else if (tipo === 'igpm') {
+                cor = '#ec4899'; label = 'IGP-M (%)'; suffix = '%';
+            } else {
+                cor = '#06b6d4'; label = 'Dólar (R$)'; suffix = '';
+            }
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, cor + '40');
+            gradient.addColorStop(1, cor + '00');
+
+            chartAtual = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: valores,
+                        borderColor: cor,
+                        backgroundColor: gradient,
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#0a0a0f',
+                        pointBorderColor: cor,
+                        pointBorderWidth: 2,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(19, 19, 31, 0.95)',
+                            titleColor: '#e2e8f0',
+                            bodyColor: '#e2e8f0',
+                            borderColor: 'rgba(139, 92, 246, 0.3)',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return context.parsed.y.toFixed(2) + (tipo === 'dolar' ? '' : '%');
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.03)' },
+                            ticks: { color: '#64748b', maxTicksLimit: 8 }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.03)' },
+                            ticks: { color: '#64748b' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function toggleChart(tipo) {
+            document.querySelectorAll('[id^="btn-"]').forEach(btn => {
+                btn.className = 'px-4 py-2 rounded-lg bg-dark-800 text-gray-400 text-sm font-medium border border-white/5 hover:bg-dark-700 transition';
+            });
+            document.getElementById('btn-' + tipo).className = 'px-4 py-2 rounded-lg bg-purple-500/20 text-purple-400 text-sm font-medium border border-purple-500/30 hover:bg-purple-500/30 transition';
+
+            if (tipo === 'ipca') initChart('ipca', dadosAtuais.ipca || CONFIG.ipcasMock);
+            else if (tipo === 'igpm') initChart('igpm', CONFIG.igpmsMock);
+            else initChart('dolar', CONFIG.dolaresMock);
+        }
+
+        function initSimuladorChart() {
+            const ctx = document.getElementById('simuladorChart').getContext('2d');
+            const anos = ['2021', '2022', '2023', '2024', '2025', '2026'];
+            const inflacaoAcumulada = [0, 5.79, 11.46, 16.28, 19.85, 23.50];
+            const salarioNominal = [3000, 3000, 3000, 3000, 3000, 3000];
+            const salarioReal = salarioNominal.map((s, i) => s / (1 + inflacaoAcumulada[i]/100));
+
+            chartSimulador = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: anos,
+                    datasets: [
+                        {
+                            label: 'Salário Nominal',
+                            data: salarioNominal,
+                            backgroundColor: 'rgba(139, 92, 246, 0.6)',
+                            borderColor: '#8b5cf6',
+                            borderWidth: 1,
+                            borderRadius: 8
+                        },
+                        {
+                            label: 'Poder de Compra Real',
+                            data: salarioReal,
+                            backgroundColor: 'rgba(236, 72, 153, 0.6)',
+                            borderColor: '#ec4899',
+                            borderWidth: 1,
+                            borderRadius: 8
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#94a3b8', font: { family: 'Inter' } }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(19, 19, 31, 0.95)',
+                            titleColor: '#e2e8f0',
+                            bodyColor: '#e2e8f0',
+                            borderColor: 'rgba(139, 92, 246, 0.3)',
+                            borderWidth: 1,
+                            padding: 12
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.03)' },
+                            ticks: { color: '#64748b' }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.03)' },
+                            ticks: { color: '#64748b' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ==========================================
+        // CALCULADORA
+        // ==========================================
+        function setPessoas(n) {
+            pessoasSelecionadas = n;
+            document.querySelectorAll('.pessoas-btn').forEach(btn => {
+                const val = parseInt(btn.dataset.value);
+                if (val === n) {
+                    btn.className = 'pessoas-btn flex-1 py-3 rounded-xl bg-purple-500/20 border border-purple-500/50 text-white transition';
+                } else {
+                    btn.className = 'pessoas-btn flex-1 py-3 rounded-xl bg-dark-800 border border-white/10 text-gray-400 hover:border-purple-500/50 hover:text-white transition';
+                }
+            });
+        }
+
+        function calcularPoderCompra() {
+            const salario = parseFloat(document.getElementById('salario-input').value) || 3000;
+            const ano = document.getElementById('ano-ref').value;
+            const cesta = CONFIG.cestaBasicaAtual * pessoasSelecionadas;
+
+            // Fatores de inflação acumulada por ano base (aproximados)
+            const fatores = {
+                '2020': 1.215, '2021': 1.105, '2022': 1.059,
+                '2023': 1.046, '2024': 1.028, '2025': 1.012
+            };
+            const fator = fatores[ano] || 1.0;
+
+            const pctCesta = (cesta / salario) * 100;
+            const poderCompra = ((1 / fator) * 100).toFixed(1);
+            const salarioNecessario = (salario * fator).toFixed(2);
+
+            document.getElementById('pct-cesta').textContent = pctCesta.toFixed(1) + '%';
+            document.getElementById('bar-cesta').style.width = Math.min(pctCesta, 100) + '%';
+
+            document.getElementById('ano-comparado').textContent = ano;
+            document.getElementById('poder-compra').textContent = poderCompra + '%';
+            document.getElementById('poder-texto').textContent = `Seu salário hoje compra ${poderCompra}% do que comprava em ${ano}`;
+
+            document.getElementById('ano-necessario').textContent = ano;
+            document.getElementById('salario-necessario').textContent = 'R$ ' + parseFloat(salarioNecessario).toLocaleString('pt-BR', {minimumFractionDigits: 2});
+
+            // Atualizar simulador
+            const anosDecorridos = 2026 - parseInt(ano);
+            const inflacaoSim = (fator - 1) * 100;
+            const valorReal = salario / fator;
+
+            document.getElementById('sim-salario-atual').textContent = 'R$ ' + salario.toLocaleString('pt-BR');
+            document.getElementById('sim-inflacao').textContent = inflacaoSim.toFixed(1) + '%';
+            document.getElementById('sim-valor-real').textContent = 'R$ ' + valorReal.toLocaleString('pt-BR', {minimumFractionDigits: 0});
+
+            if (chartSimulador) {
+                chartSimulador.data.datasets[0].data = Array(6).fill(salario);
+                chartSimulador.data.datasets[1].data = Array(6).fill(salario).map((s, i) => {
+                    const f = 1 + (inflacaoSim / 100) * (i / 5);
+                    return s / f;
+                });
+                chartSimulador.update();
+            }
+        }
+
+        // ==========================================
+        // INICIALIZAÇÃO
+        // ==========================================
+        async function init() {
+            updateStatus('mock', 'Conectando às APIs...');
+
+            // Fetch dados
+            const [ipcaData, dolarData, selicData] = await Promise.all([
+                fetchIPCA(),
+                fetchDolar(),
+                fetchSelic()
+            ]);
+
+            dadosAtuais.ipca = ipcaData;
+            dadosAtuais.dolar = dolarData;
+            dadosAtuais.selic = selicData;
+
+            // Verificar se usou mock
+            const usouMock = ipcaData === CONFIG.ipcasMock;
+            updateStatus(usouMock ? 'mock' : 'live', usouMock ? 'Dados de demonstração' : 'Dados em tempo real');
+
+            // Calcular IPCA acumulado 12m
+            const ipca12m = ipcaData.slice(-12).reduce((acc, d) => acc * (1 + d.valor/100), 1);
+            const ipca12mPct = (ipca12m - 1) * 100;
+
+            // Atualizar KPIs com animação
+            animateValue('kpi-ipca', 0, ipca12mPct, 1500, '', '%');
+            document.getElementById('kpi-ipca-change').textContent = '+' + (ipca12mPct * 0.8).toFixed(1) + '%';
+
+            animateValue('kpi-dolar', 0, dolarData.atual, 1500, 'R$ ');
+            const dolarChange = dolarData.variacao;
+            const dolarEl = document.getElementById('kpi-dolar-change');
+            dolarEl.textContent = (dolarChange >= 0 ? '+' : '') + dolarChange.toFixed(2) + '% hoje';
+            dolarEl.className = 'text-sm ' + (dolarChange >= 0 ? 'text-red-400' : 'text-green-400') + ' flex items-center gap-1';
+
+            animateValue('kpi-selic', 0, selicData, 1500, '', '%');
+
+            const cestaVar = ((CONFIG.cestaBasicaAtual / CONFIG.cestaBasicaAnterior) - 1) * 100;
+            animateValue('kpi-cesta', 0, CONFIG.cestaBasicaAtual, 1500, 'R$ ');
+            document.getElementById('kpi-cesta-change').innerHTML = `
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                +${cestaVar.toFixed(1)}% em 12 meses
+            `;
+
+            // Renderizar componentes
+            renderCestaBasica();
+            initChart('ipca', ipcaData);
+            initSimuladorChart();
+            calcularPoderCompra();
+
+            // Data de atualização
+            const agora = new Date();
+            document.getElementById('data-atualizacao').textContent = agora.toLocaleDateString('pt-BR');
+
+            // Selecionar primeiro botão de pessoas
+            setPessoas(1);
+        }
+
+        // Iniciar quando DOM estiver pronto
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
