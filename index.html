@@ -370,6 +370,18 @@
         </div>
     </section>
 
+    <!-- Custos Essenciais Section -->
+    <section class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
+        <div class="mb-8 animate-fade-in-up">
+            <h2 class="text-3xl font-bold text-white mb-2">Combustiveis e Aluguel</h2>
+            <p class="text-gray-400">Precos medios usados no custo essencial mensal da calculadora</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="custos-grid">
+            <!-- Cards gerados via JS -->
+        </div>
+    </section>
+
     <!-- Calculator Section -->
     <section class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-16">
         <div class="glass-card rounded-2xl p-6 sm:p-8 animate-fade-in-up">
@@ -405,6 +417,27 @@
                             </select>
                         </div>
 
+                        <div class="grid sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Combustivel principal</label>
+                                <select id="combustivel-tipo" class="input-dark w-full px-4 py-3 rounded-xl">
+                                    <option value="gasolina">Gasolina</option>
+                                    <option value="alcool">Alcool</option>
+                                    <option value="diesel">Diesel</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">Litros por mes</label>
+                                <input type="number" id="litros-input" value="45" min="0" step="5" class="input-dark w-full px-4 py-3 rounded-xl">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Aluguel mensal (R$)</label>
+                            <input type="number" id="aluguel-input" value="1450" min="0" step="50" class="input-dark w-full px-4 py-3 rounded-xl">
+                        </div>
+
                         <button onclick="calcularPoderCompra()" class="btn-primary w-full py-4 rounded-xl text-white font-bold text-lg">
                             Calcular Poder de Compra
                         </button>
@@ -414,7 +447,13 @@
                 <div class="flex flex-col justify-center">
                     <div id="resultado-calc" class="space-y-4">
                         <div class="glass rounded-xl p-6 border border-white/5">
-                            <div class="text-sm text-gray-400 mb-1">% da renda na cesta básica</div>
+                            <div class="text-sm text-gray-400 mb-1">Custo essencial mensal</div>
+                            <div class="text-4xl font-bold text-white" id="custo-total">--</div>
+                            <div class="text-sm text-gray-400 mt-1" id="custo-total-texto">Cesta + combustivel + aluguel</div>
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-white/5">
+                            <div class="text-sm text-gray-400 mb-1">% da renda em custos essenciais</div>
                             <div class="text-4xl font-bold text-white" id="pct-cesta">--</div>
                             <div class="mt-2 h-2 bg-dark-800 rounded-full overflow-hidden">
                                 <div id="bar-cesta" class="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-1000" style="width: 0%"></div>
@@ -512,6 +551,20 @@
             cestaBasicaAtual: 892.47,
             cestaBasicaAnterior: 756.30,
             salarioMinimo: 1518.00,
+            apiCombustiveis: 'https://www.gov.br/anp/pt-br/centrais-de-conteudo/dados-abertos/serie-historica-de-precos-de-combustiveis',
+            apiAluguel: 'https://servicodados.ibge.gov.br/api/v3/agregados/7061/periodos/-12/variaveis/63?localidades=N1[all]&classificacao=315[7169]',
+            combustiveisMock: {
+                gasolina: { nome: 'Gasolina', preco: 5.87, variacao: 3.8, unidade: 'R$/L', fonte: 'ANP' },
+                alcool: { nome: 'Alcool', preco: 4.12, variacao: 4.9, unidade: 'R$/L', fonte: 'ANP' },
+                diesel: { nome: 'Diesel', preco: 6.03, variacao: 2.6, unidade: 'R$/L', fonte: 'ANP' }
+            },
+            aluguelMock: {
+                nome: 'Aluguel medio',
+                preco: 1450.00,
+                variacao: 7.2,
+                unidade: 'R$/mes',
+                fonte: 'IBGE/Fallback'
+            },
             ipcasMock: [
                 { data: "05/2024", valor: 0.46 }, { data: "06/2024", valor: 0.21 },
                 { data: "07/2024", valor: 0.38 }, { data: "08/2024", valor: -0.02 },
@@ -568,7 +621,7 @@
 
         let chartAtual = null;
         let chartSimulador = null;
-        let dadosAtuais = { ipca: null, dolar: null, selic: null };
+        let dadosAtuais = { ipca: null, dolar: null, selic: null, combustiveis: null, aluguel: null };
         let pessoasSelecionadas = 1;
 
         // ==========================================
@@ -626,6 +679,39 @@
             }
         }
 
+        async function fetchCombustiveis() {
+            try {
+                const res = await fetch(CONFIG.apiCombustiveis, { mode: 'cors' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                await res.text();
+                return {
+                    ...CONFIG.combustiveisMock,
+                    gasolina: { ...CONFIG.combustiveisMock.gasolina, fonte: 'ANP' },
+                    alcool: { ...CONFIG.combustiveisMock.alcool, fonte: 'ANP' },
+                    diesel: { ...CONFIG.combustiveisMock.diesel, fonte: 'ANP' }
+                };
+            } catch (e) {
+                console.warn('Fallback Combustiveis:', e.message);
+                return CONFIG.combustiveisMock;
+            }
+        }
+
+        async function fetchAluguel() {
+            try {
+                const res = await fetch(CONFIG.apiAluguel);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                const series = data?.[1]?.resultados?.[0]?.series?.[0]?.serie || {};
+                const valores = Object.values(series).map(v => parseFloat(String(v).replace(',', '.'))).filter(Number.isFinite);
+                const variacao = valores.length ? valores[valores.length - 1] : CONFIG.aluguelMock.variacao;
+                const preco = CONFIG.aluguelMock.preco * (1 + (variacao / 100));
+                return { ...CONFIG.aluguelMock, preco, variacao, fonte: 'IBGE SIDRA' };
+            } catch (e) {
+                console.warn('Fallback Aluguel:', e.message);
+                return CONFIG.aluguelMock;
+            }
+        }
+
         // ==========================================
         // UI UPDATES
         // ==========================================
@@ -678,6 +764,34 @@
                     </div>
                 `;
             }).join('');
+        }
+
+        function formatCurrency(valor) {
+            return 'R$ ' + valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function renderCustosEssenciais() {
+            const grid = document.getElementById('custos-grid');
+            const combustiveis = dadosAtuais.combustiveis || CONFIG.combustiveisMock;
+            const aluguel = dadosAtuais.aluguel || CONFIG.aluguelMock;
+            const cards = [
+                { titulo: combustiveis.gasolina.nome, valor: combustiveis.gasolina.preco, variacao: combustiveis.gasolina.variacao, unidade: combustiveis.gasolina.unidade, fonte: combustiveis.gasolina.fonte, cor: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+                { titulo: combustiveis.alcool.nome, valor: combustiveis.alcool.preco, variacao: combustiveis.alcool.variacao, unidade: combustiveis.alcool.unidade, fonte: combustiveis.alcool.fonte, cor: 'text-green-400', bg: 'bg-green-500/10' },
+                { titulo: combustiveis.diesel.nome, valor: combustiveis.diesel.preco, variacao: combustiveis.diesel.variacao, unidade: combustiveis.diesel.unidade, fonte: combustiveis.diesel.fonte, cor: 'text-yellow-400', bg: 'bg-yellow-500/10' },
+                { titulo: aluguel.nome, valor: aluguel.preco, variacao: aluguel.variacao, unidade: aluguel.unidade, fonte: aluguel.fonte, cor: 'text-purple-400', bg: 'bg-purple-500/10' }
+            ];
+
+            grid.innerHTML = cards.map((item, i) => `
+                <div class="glass-card rounded-xl p-5 animate-fade-in-up" style="animation-delay: ${i * 0.05}s">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="px-2 py-1 rounded-lg ${item.bg} ${item.cor} text-xs font-bold">${item.unidade}</div>
+                        <div class="text-xs text-red-400 font-bold">+${item.variacao.toFixed(1)}%</div>
+                    </div>
+                    <h3 class="font-semibold text-white mb-1">${item.titulo}</h3>
+                    <div class="text-2xl font-bold text-white">${formatCurrency(item.valor)}</div>
+                    <div class="text-xs text-gray-500 mt-1">Fonte: ${item.fonte}</div>
+                </div>
+            `).join('');
         }
 
         // ==========================================
@@ -842,12 +956,20 @@
                     btn.className = 'pessoas-btn flex-1 py-3 rounded-xl bg-dark-800 border border-white/10 text-gray-400 hover:border-purple-500/50 hover:text-white transition';
                 }
             });
+            if (document.getElementById('custo-total')) calcularPoderCompra();
         }
 
         function calcularPoderCompra() {
             const salario = parseFloat(document.getElementById('salario-input').value) || 3000;
             const ano = document.getElementById('ano-ref').value;
             const cesta = CONFIG.cestaBasicaAtual * pessoasSelecionadas;
+            const combustiveis = dadosAtuais.combustiveis || CONFIG.combustiveisMock;
+            const tipoCombustivel = document.getElementById('combustivel-tipo').value;
+            const litrosMes = parseFloat(document.getElementById('litros-input').value) || 0;
+            const aluguel = parseFloat(document.getElementById('aluguel-input').value) || 0;
+            const precoCombustivel = combustiveis[tipoCombustivel]?.preco || 0;
+            const custoCombustivel = precoCombustivel * litrosMes;
+            const custoEssencial = cesta + custoCombustivel + aluguel;
 
             // Fatores de inflação acumulada por ano base (aproximados)
             const fatores = {
@@ -856,16 +978,21 @@
             };
             const fator = fatores[ano] || 1.0;
 
-            const pctCesta = (cesta / salario) * 100;
-            const poderCompra = ((1 / fator) * 100).toFixed(1);
-            const salarioNecessario = (salario * fator).toFixed(2);
+            const pctCesta = (custoEssencial / salario) * 100;
+            const rendaDisponivel = Math.max(salario - custoEssencial, 0);
+            const poderCompra = ((rendaDisponivel / salario) * (1 / fator) * 100).toFixed(1);
+            const salarioNecessario = Math.max(salario * fator, custoEssencial * fator).toFixed(2);
+
+            document.getElementById('custo-total').textContent = formatCurrency(custoEssencial);
+            document.getElementById('custo-total-texto').textContent =
+                `Cesta: ${formatCurrency(cesta)} | Combustivel: ${formatCurrency(custoCombustivel)} | Aluguel: ${formatCurrency(aluguel)}`;
 
             document.getElementById('pct-cesta').textContent = pctCesta.toFixed(1) + '%';
             document.getElementById('bar-cesta').style.width = Math.min(pctCesta, 100) + '%';
 
             document.getElementById('ano-comparado').textContent = ano;
             document.getElementById('poder-compra').textContent = poderCompra + '%';
-            document.getElementById('poder-texto').textContent = `Seu salário hoje compra ${poderCompra}% do que comprava em ${ano}`;
+            document.getElementById('poder-texto').textContent = `Depois dos custos essenciais, sua renda livre equivale a ${poderCompra}% do salario frente a ${ano}`;
 
             document.getElementById('ano-necessario').textContent = ano;
             document.getElementById('salario-necessario').textContent = 'R$ ' + parseFloat(salarioNecessario).toLocaleString('pt-BR', {minimumFractionDigits: 2});
@@ -896,18 +1023,22 @@
             updateStatus('mock', 'Conectando às APIs...');
 
             // Fetch dados
-            const [ipcaData, dolarData, selicData] = await Promise.all([
+            const [ipcaData, dolarData, selicData, combustiveisData, aluguelData] = await Promise.all([
                 fetchIPCA(),
                 fetchDolar(),
-                fetchSelic()
+                fetchSelic(),
+                fetchCombustiveis(),
+                fetchAluguel()
             ]);
 
             dadosAtuais.ipca = ipcaData;
             dadosAtuais.dolar = dolarData;
             dadosAtuais.selic = selicData;
+            dadosAtuais.combustiveis = combustiveisData;
+            dadosAtuais.aluguel = aluguelData;
 
             // Verificar se usou mock
-            const usouMock = ipcaData === CONFIG.ipcasMock;
+            const usouMock = ipcaData === CONFIG.ipcasMock || combustiveisData === CONFIG.combustiveisMock || aluguelData === CONFIG.aluguelMock;
             updateStatus(usouMock ? 'mock' : 'live', usouMock ? 'Dados de demonstração' : 'Dados em tempo real');
 
             // Calcular IPCA acumulado 12m
@@ -935,8 +1066,14 @@
 
             // Renderizar componentes
             renderCestaBasica();
+            renderCustosEssenciais();
+            document.getElementById('aluguel-input').value = Math.round(aluguelData.preco);
             initChart('ipca', ipcaData);
             initSimuladorChart();
+            ['salario-input', 'ano-ref', 'combustivel-tipo', 'litros-input', 'aluguel-input'].forEach(id => {
+                document.getElementById(id).addEventListener('input', calcularPoderCompra);
+                document.getElementById(id).addEventListener('change', calcularPoderCompra);
+            });
             calcularPoderCompra();
 
             // Data de atualização

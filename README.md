@@ -57,6 +57,8 @@ brasil-preco-justo/
 
 | Fonte | Endpoint | Dado |
 |-------|----------|------|
+| ANP | `gov.br/anp/.../serie-historica-de-precos-de-combustiveis` | Gasolina, alcool e diesel |
+| IBGE SIDRA | `servicodados.ibge.gov.br/api/v3/agregados/7061` | Variacao de aluguel residencial |
 | Banco Central | `api.bcb.gov.br/dados/serie/bcdata.sgs.433` | IPCA mensal |
 | Banco Central | `api.bcb.gov.br/dados/serie/bcdata.sgs.189` | IGP-M |
 | Banco Central | `api.bcb.gov.br/dados/serie/bcdata.sgs.432` | Selic |
